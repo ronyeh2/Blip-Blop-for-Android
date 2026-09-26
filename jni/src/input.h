@@ -372,13 +372,17 @@ class Touch_manager
 
 
 
+// Android lifecycle hooks (blip_n_blop_3.cpp)
+void app_pause();
+void app_resume();
+
 class Input : public Touch_manager
 {
 private:
 	int				n_joy;
 	DIJOYSTATE		js[MAX_JOY];
 	char 			buffer[256];
-	char			specialsbuffer[0xFFF];
+	char			specialsbuffer[0x1000];
 	unsigned int	aliastab[256];
 
 public:

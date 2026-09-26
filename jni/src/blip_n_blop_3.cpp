@@ -5,12 +5,15 @@ HWND	WinHandle=NULL;
 
 
 
-void Java_org_libsdl_app_SDLActivity_nativeStop(JNIEnv* env)
+// Called from Input::update() on SDL_APP_WILLENTERBACKGROUND / DIDENTERFOREGROUND.
+// (Replaces the old SDLActivity.nativeStop()/nativeRestart() JNI hooks, which ran
+// on the Java UI thread and raced with the game thread.)
+void app_pause()
 {
     game.Pause();
 }
 
-void Java_org_libsdl_app_SDLActivity_nativeRestart(JNIEnv* env)
+void app_resume()
 {
     game.Resume();
 }

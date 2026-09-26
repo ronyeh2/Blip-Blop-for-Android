@@ -2820,7 +2820,8 @@ void Game::updateTouch()
 
         if(indp == -1 || (indp != -1 &&  (in.finger[indp].state == TOUCH_UP || in.finger[indp].state == TOUCH_NOTHING)) )
         {
-            in.finger[indp].ptr = NULL;
+            if(indp != -1)
+                in.finger[indp].ptr = NULL;
             in.padded = false;
         }
         else
@@ -4025,6 +4026,7 @@ bool Game::showGameOver()
 		}
 	*/
 	mbk_inter.stop();
+	return true;
 }
 
 
@@ -4365,6 +4367,7 @@ bool Game::showBriefing(char * fn)
 	LOGI("LOADING");
 	fnt_rpg.printC(backSurface, 320, 460, "Loading...");
 	DDFlip();
+	return true;
 }
 
 //-----------------------------------------------------------------------------

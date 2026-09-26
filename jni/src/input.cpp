@@ -107,7 +107,7 @@ Input		in;
 Input::Input() : n_joy(0)
 {
 	ZeroMemory(buffer, 256);
-	ZeroMemory(specialsbuffer, 0xFFF);
+	ZeroMemory(specialsbuffer, sizeof(specialsbuffer));
 	gauche = false;
     haut = false;
     droit = false;
@@ -137,11 +137,16 @@ bool Input::open(HWND wh, HINSTANCE inst, int flags)
 	SDL_JoystickEventState(SDL_TRUE);
 
 	this->n_joy = SDL_NumJoysticks();
+	if (n_joy > MAX_JOY)
+		n_joy = MAX_JOY;
+	if (n_joy < 0)
+		n_joy = 0;
 
 	for (int i = 0; i < n_joy; i++)
 	{
 		js[i].handle = SDL_JoystickOpen(i);
-		strcpy(this->js[i].name, SDL_JoystickName(js[i].handle));
+		const char *jname = js[i].handle ? SDL_JoystickName(js[i].handle) : NULL;
+		SDL_strlcpy(this->js[i].name, jname ? jname : "", sizeof(this->js[i].name));
 	}
 
 	/*if (dinput != NULL) {
@@ -249,6 +254,13 @@ void Input::update()
 {
 	SDL_Event e;
 	while (SDL_PollEvent(&e)){
+
+		// Android lifecycle, handled here on the game thread (SDL blocks this
+		// thread while the activity is paused).
+		if (e.type == SDL_APP_WILLENTERBACKGROUND)
+			app_pause();
+		if (e.type == SDL_APP_DIDENTERFOREGROUND)
+			app_resume();
 
 		if (e.type == SDL_QUIT)
 		{
