@@ -1,0 +1,71 @@
+// Single-module Android project. The legacy Eclipse/ant layout (AndroidManifest.xml,
+// src/, res/, assets/, jni/ at the repository root) is kept as-is via sourceSets.
+plugins {
+    id 'com.android.application' version '8.7.3'
+}
+
+android {
+    namespace 'com.blip.blop'
+    compileSdk 35
+    ndkVersion '27.2.12479018'
+
+    defaultConfig {
+        applicationId 'com.blip.blop'
+        minSdk 21
+        targetSdk 35
+        versionCode 9
+        versionName '3.1'
+
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+        }
+        externalNativeBuild {
+            ndkBuild {
+                arguments "-j${Runtime.runtime.availableProcessors()}"
+            }
+        }
+    }
+
+    externalNativeBuild {
+        ndkBuild {
+            path 'jni/Android.mk'
+        }
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            java.srcDirs = ['src']
+            res.srcDirs = ['res']
+            assets.srcDirs = ['assets']
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        release {
+            // R8 must not rename org.libsdl.app: the native code looks it up by name.
+            minifyEnabled false
+        }
+    }
+
+    packaging {
+        jniLibs {
+            // Store .so files uncompressed and 16 KB aligned in the APK.
+            useLegacyPackaging false
+        }
+    }
+
+    androidResources {
+        // Music is streamed straight from the APK; keep it uncompressed.
+        noCompress 'zik', 'mp3'
+    }
+
+    lint {
+        abortOnError false
+    }
+}
