@@ -385,6 +385,9 @@ void Input::padAdded(int device_index)
 			pads[p].trig_on[0] = pads[p].trig_on[1] = false;
 			const char *nm = SDL_GameControllerName(pads[p].gc);
 			LOGI("Controller connected: '%s' -> player %d", nm ? nm : "?", p + 1);
+			char *map = SDL_GameControllerMapping(pads[p].gc);
+			LOGI("  mapping: %s", map ? map : "?");
+			SDL_free(map);
 			n_joy = nbPads();
 			return;
 		}
@@ -407,6 +410,12 @@ void Input::padRemoved(SDL_JoystickID id)
 	LOGI("Controller of player %d disconnected", p + 1);
 	n_joy = nbPads();
 
+	// In a 2-player game the slots stay put, so replugging gives the
+	// player back their own character. Otherwise the controller that is
+	// left becomes player 1.
+	if (!two_players && compactPads())
+		p = 1;
+
 	// A controller vanished (unplugged, asleep, flat battery): the level
 	// pauses (Game::updateMenu). Kept apart from pause_pending, which the
 	// pause menu reads as "resume".
@@ -416,6 +425,31 @@ void Input::padRemoved(SDL_JoystickID id)
 	for (int i = 0; i < SDL_NumJoysticks() && pads[p].gc == NULL; i++)
 		if (SDL_JoystickGetDeviceInstanceID(i) != id)
 			padAdded(i);
+}
+
+// Player 1's slot is free but player 2's is not: move player 2's
+// controller to player 1, so the next one plugged in is player 2.
+bool Input::compactPads()
+{
+	if (pads[0].gc != NULL || pads[1].gc == NULL)
+		return false;
+	pads[0] = pads[1];
+	pads[1].gc = NULL;
+	pads[1].id = -1;
+	pads[1].stick_dir = -1;
+	for (int i = 0; i < NB_ACT; i++) {
+		act_held[0][i] = act_held[1][i];
+		act_held[1][i] = false;
+	}
+	LOGI("Controller of player 2 is now player 1");
+	return true;
+}
+
+void Input::setTwoPlayers(bool on)
+{
+	two_players = on;
+	if (!on)
+		compactPads();
 }
 
 int Input::padSlot(SDL_JoystickID id) const

@@ -492,6 +492,7 @@ private:
 		bool					trig_on[2];
 	};
 	PadSlot			pads[NB_PAD_PLAYERS];
+	bool			compactPads();
 	bool			act_held[NB_PAD_PLAYERS][NB_ACT];
 	bool			pad_any_held;		// a controller button / stick is held
 	int				super_pending[NB_PAD_PLAYERS];
@@ -553,7 +554,7 @@ public:
 	float	padAim(int player) const { return aim[player]; }
 	bool	padHasDir(int player) const;
 	int		nbPads() const;
-	void	setTwoPlayers(bool on) { two_players = on; }
+	void	setTwoPlayers(bool on);
 	void	clearPadInput(bool keep_disconnect = false);
 };
 

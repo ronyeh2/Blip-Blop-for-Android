@@ -81,6 +81,11 @@
 #include "trace.h"
 #include "precache.h"
 
+// Touch jump / fire taps held for a few updates (see updateTouch).
+static const int TAP_UPDATES = 6;
+static int jump_tap = 0, shoot_tap = 0;
+static bool jump_gap = false, shoot_gap = false;
+
 Personnage	dummyPlayer;
 int glorf;
 
@@ -525,6 +530,8 @@ bool Game::joueNiveau(const char * nom_niveau, int type)
 	// Drop the START / A / B that ended the briefing, a cutscene or the
 	// previous level, so the level does not open paused, jumping or bombing.
 	in.clearPadInput(true);
+	jump_tap = shoot_tap = 0;
+	jump_gap = shoot_gap = false;
 
 	// Update quelques trucs
 	//
@@ -2943,22 +2950,41 @@ void Game::updateTouch()
 
     // A quick tap on jump / fire can start and end between two checks of
     // the buttons above: hold it for a few updates so it still counts.
-    static const int TAP_UPDATES = 6;
-    static int jump_tap = 0, shoot_tap = 0;
+    // A new tap while one is held first releases the button for one
+    // update, so two quick taps stay two presses (double jump, semi-auto
+    // weapons) instead of merging into one long one.
     float tx, ty;
     while(in.take_tap(tx, ty))
     {
         if(box_manager.contains("jump", tx, ty))
-        jump_tap = TAP_UPDATES;
+        {
+            if(jump_tap > 0)
+            jump_gap = true;
+            jump_tap = TAP_UPDATES;
+        }
         if(box_manager.contains("shoot", tx, ty))
-        shoot_tap = TAP_UPDATES;
+        {
+            if(shoot_tap > 0)
+            shoot_gap = true;
+            shoot_tap = TAP_UPDATES;
+        }
     }
-    if(jump_tap > 0)
+    if(jump_gap)
+    {
+        in.sauter = false;
+        jump_gap = false;
+    }
+    else if(jump_tap > 0)
     {
         in.sauter = true;
         jump_tap--;
     }
-    if(shoot_tap > 0)
+    if(shoot_gap)
+    {
+        in.tirer = false;
+        shoot_gap = false;
+    }
+    else if(shoot_tap > 0)
     {
         in.tirer = true;
         shoot_tap--;
