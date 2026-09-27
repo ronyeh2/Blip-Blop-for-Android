@@ -49,8 +49,12 @@ void load_BB3_config(const char * cfg_file)
 	int		a;
 
 	///MODIF PATH
+	// The config file is not read on Android: builds before this one saved
+	// it with every key alias at 0, and reading that back would break the
+	// keys again. The default keys are always used.
 	if(create_pathSDL(cfg_file))
 	LOGI("PATH : _%s_ ", create_pathSDL(cfg_file));
+	set_default_config(true);
 	return ;
 
 	fic = fopen(create_pathSDL(cfg_file), "rb");

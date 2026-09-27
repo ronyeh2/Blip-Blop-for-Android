@@ -123,7 +123,7 @@ Phones: enable USB debugging, then run `adb install -r build/outputs/apk/debug/B
 | BACK / SELECT             | Pause menu                | Back          |
 
 The first controller plays player 1. In a 2-player game the second
-controller plays player 2.
+controller plays player 2 (see [Two players](#two-players)).
 
 ### TV remote (Shield remote, Android TV remotes)
 
@@ -160,8 +160,33 @@ over) continue on OK, A, START or BACK.
 | P                          | Pause menu                  |
 | Backspace                  | Back (menus)                |
 
+These keys always play player 1. In a 2-player game player 2 can also use
+the keys of the PC game: Q, S, D, F (up, down, left, right), Tab (fire), G
+(jump) and H (cow bomb).
+
 ### Touch (phones)
 
 Drag anywhere on the left half of the screen for the virtual stick. The
 buttons at the bottom right are fire, jump and cow bomb, and the button at the
 top right is pause.
+
+### Two players
+
+1. Connect two game controllers (Bluetooth or USB). The first one to connect
+   is player 1, the second one is player 2. A third controller is ignored
+   until one of the two is disconnected, then it takes the free place.
+2. Choose **START GAME > START 2 PLAYERS GAME**. With fewer than two
+   controllers the game says "Connect two game controllers to play with two
+   players" and stays in the menu.
+3. On the character screen, player 1 picks Blip or Blop and player 2 gets the
+   other one. Each player has a score / lives / ammo display: player 1 on
+   the left, player 2 on the right.
+
+Either controller moves through the menus and can pause or resume the game.
+If a controller is disconnected during a level, the game pauses. Connect it
+again (it gets its place back) and resume. When a player loses all lives,
+the other one keeps playing until the game is over.
+
+Two players need two controllers. The TV remote, the keyboard keys in the
+table above and the touch controls always play player 1, so one controller
+plus a remote or the touch screen is not enough for 2 players.

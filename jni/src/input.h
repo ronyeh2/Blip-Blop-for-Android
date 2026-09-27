@@ -188,6 +188,9 @@ void update_tir(int &x, int &y, int xd, int yd, float angle);
 #define TOUCH_DOWN     2
 #define TOUCH_UP       3
 
+// Android pointer ids tracked at once (stick + fire + jump + one spare...).
+#define MAX_FINGERS    5
+
 class Finger
 {
     public :
@@ -196,9 +199,15 @@ class Finger
         state = TOUCH_NOTHING;
         x = 0;
         y = 0;
+        ptr = NULL;
+        fresh = false;
     }
 
     int state;
+    // Went down since the last Touch_manager::refresh(). A tap shorter than
+    // a frame is only ever seen as TOUCH_UP; boxes accept such a finger only
+    // when it is fresh, not one that slid onto them from elsewhere.
+    bool fresh;
 
     float x;
     float y;
@@ -282,11 +291,24 @@ class Touch_manager
 
     bool set(int f_id, int state, float x, float y)
     {
-        if(f_id < 0 || f_id > 1)
+        if(f_id < 0 || f_id >= MAX_FINGERS)
         return false;
 
         finger[f_id].x = x;
         finger[f_id].y = y;
+
+        // A new press. Android reuses pointer id 0 once every finger is up,
+        // so a finger can go DOWN -> UP -> PRESSING (lift one button, touch
+        // another) between two frames. The owner of the lifted finger must
+        // not keep it: that button would stay held while the new one could
+        // never capture the finger (issue #2, "jump sticks to fire"). The
+        // box that lost its finger releases itself (Box::manage).
+        if(state == TOUCH_PRESSING &&
+           (finger[f_id].state == TOUCH_NOTHING || finger[f_id].state == TOUCH_UP))
+        {
+            finger[f_id].ptr = NULL;
+            finger[f_id].fresh = true;
+        }
 
         if(state == TOUCH_PRESSING && finger[f_id].state == TOUCH_DOWN)
         finger[f_id].state = TOUCH_DOWN;
@@ -294,10 +316,6 @@ class Touch_manager
         finger[f_id].state = TOUCH_UP;
         else
         finger[f_id].state = state;
-
-        if(finger[f_id].state == TOUCH_UP)
-        LOGI("UP");
-
 
         if(finger[f_id].state == TOUCH_NOTHING)
         finger[f_id].ptr = NULL;
@@ -309,8 +327,9 @@ class Touch_manager
     {
         int i;
 
-        for(i = 0; i < 2; i++)
+        for(i = 0; i < MAX_FINGERS; i++)
         {
+            finger[i].fresh = false;
             if(finger[i].state == TOUCH_PRESSING)
             finger[i].state = TOUCH_DOWN;
             if(finger[i].state == TOUCH_UP)
@@ -327,18 +346,20 @@ class Touch_manager
         tirer = false;
         sauter = false;
         ulti = false;
+        ulti2 = false;
         clear_pad_edges();
     }
 
     void reset()
     {
         int i;
-        for(i = 0; i < 2; i++)
+        for(i = 0; i < MAX_FINGERS; i++)
         {
             finger[i].x = 0;
             finger[i].y = 0;
             finger[i].state = TOUCH_NOTHING;
             finger[i].ptr = NULL;
+            finger[i].fresh = false;
         }
 
         gauche = false;
@@ -348,6 +369,7 @@ class Touch_manager
         tirer = false;
         sauter = false;
         ulti = false;
+        ulti2 = false;
         angle = 0;
         dist = 0;
         clear_pad_edges();
@@ -357,7 +379,7 @@ class Touch_manager
     {
         int i;
 
-        for(i = 0; i < 2; i++)
+        for(i = 0; i < MAX_FINGERS; i++)
         {
             if(finger[i].state == TOUCH_UP)
             return i;
@@ -373,7 +395,7 @@ class Touch_manager
     {
         int i;
 
-        for(i = 0; i < 2; i++)
+        for(i = 0; i < MAX_FINGERS; i++)
         {
             if(finger[i].state == TOUCH_PRESSING || finger[i].state == TOUCH_DOWN)
             return i;
@@ -390,7 +412,7 @@ class Touch_manager
     {
         int i;
 
-        for(i = 0; i < 2; i++)
+        for(i = 0; i < MAX_FINGERS; i++)
         {
             if(finger[i].ptr == ptr)
             return i;
@@ -403,7 +425,7 @@ class Touch_manager
     {
         int i;
 
-        for(i = 0; i < 2; i++)
+        for(i = 0; i < MAX_FINGERS; i++)
         {
             if(finger[i].state == TOUCH_PRESSING)
             return i;
@@ -419,7 +441,7 @@ class Touch_manager
     {
         int i;
 
-        for(i = 0; i < 2; i++)
+        for(i = 0; i < MAX_FINGERS; i++)
         {
             if(finger[i].state != TOUCH_NOTHING)
             return false;
@@ -428,7 +450,7 @@ class Touch_manager
         return true;
     }
 
-    Finger finger[2];
+    Finger finger[MAX_FINGERS];
     bool gauche;
     bool haut;
     bool droit;
@@ -436,6 +458,7 @@ class Touch_manager
     bool tirer;
     bool sauter;
     bool ulti;
+    bool ulti2;		// player 2 cow bomb, this update (Game::updateTouch)
 
     bool padded;
     double pad_x;
@@ -497,7 +520,8 @@ public:
 
 	inline int scanAlias(int a) const
 	{
-		return (scanKey(aliastab[a]));
+		// 0 = SDLK_UNKNOWN: an unset alias is never "held".
+		return aliastab[a] != 0 && scanKey(aliastab[a]);
 	};
 	inline unsigned int getAlias(int n) const
 	{

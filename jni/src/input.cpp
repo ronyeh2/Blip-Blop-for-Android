@@ -133,6 +133,7 @@ Input::Input() : n_joy(0)
     tirer = false;
     sauter = false;
     ulti = false;
+    ulti2 = false;
     padded = false;
     angle = 0;
 }
@@ -409,6 +410,11 @@ void Input::padRemoved(SDL_JoystickID id)
 	// pauses (Game::updateMenu). Kept apart from pause_pending, which the
 	// pause menu reads as "resume".
 	disconnect_pending = true;
+
+	// A controller ignored while both slots were taken takes the free one.
+	for (int i = 0; i < SDL_NumJoysticks() && pads[p].gc == NULL; i++)
+		if (SDL_JoystickGetDeviceInstanceID(i) != id)
+			padAdded(i);
 }
 
 int Input::padSlot(SDL_JoystickID id) const
@@ -603,6 +609,11 @@ void Input::update()
 		{
 			SDL_Keycode sym = e.key.keysym.sym;
 			char v = (e.type == SDL_KEYDOWN) ? 1 : 0;
+
+			// Keys SDL has no keycode for (Android KEYCODE_HENKAN and the
+			// like) all arrive as SDLK_UNKNOWN (0): never record them.
+			if (sym == SDLK_UNKNOWN)
+				break;
 
 			if (sym >= 0 && sym < 255)
 				buffer[sym] = v;

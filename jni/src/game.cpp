@@ -2818,19 +2818,22 @@ void Game::updateTouch()
 
     if(in.padded == false)
     {
-        int indp = in.search_pressing();
+        // The first new finger on the left half. Not just the first new
+        // finger: with a button and the stick touched in the same frame,
+        // the stick finger would never be PRESSING again.
+        int indp = -1;
+        for(int f = 0; f < MAX_FINGERS && indp == -1; f++)
+        if(in.finger[f].state == TOUCH_PRESSING && in.finger[f].x <= 0.5)
+        indp = f;
 
         if(indp != -1)
         {
-            if(in.finger[indp].x <= 0.5)
-            {
-                in.padded = true;
-                in.pad_x = in.finger[indp].x;
-                in.pad_x *= 640;
-                in.pad_y = in.finger[indp].y;
-                in.pad_y *= 480;
-                in.finger[indp].ptr = &in.padded;
-            }
+            in.padded = true;
+            in.pad_x = in.finger[indp].x;
+            in.pad_x *= 640;
+            in.pad_y = in.finger[indp].y;
+            in.pad_y *= 480;
+            in.finger[indp].ptr = &in.padded;
         }
     }
     else
@@ -2908,6 +2911,11 @@ void Game::updateTouch()
 
     if(in.takeSuper(0) && player1 != NULL && player1->nb_cow_bomb >= 1)
     in.ulti = true;
+    // Player 2's cow bomb request is taken here on every update too (read
+    // by ControlP2::super), so a press while player 2 is dead or coming back
+    // does not linger and fire a bomb later.
+    if(in.takeSuper(1) && player2 != NULL && player2->nb_cow_bomb >= 1)
+    in.ulti2 = true;
 
     if(in.droit)
     last_dir = 1;
@@ -4065,6 +4073,9 @@ bool Game::showGameOver()
 		DDFlipV();//primSurface->Flip( NULL, 0);
 		in.refresh();
 	}
+	// The press that closed this screen must not also skip the high scores.
+	in.refresh();
+	in.waitClean();
 	/*
 		if ( !app_killed)
 		{
@@ -4328,6 +4339,11 @@ void Game::go()
 			    LOGI("A DEUX");
 			    jouePartie(2, selectPlayer());
 			}
+
+			// The press that closed the high scores (or the game) must not
+			// also activate START GAME in the menu.
+			in.refresh();
+			in.waitClean();
 
 			menu.stop();
 			menu.start();

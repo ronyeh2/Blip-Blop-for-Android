@@ -208,7 +208,15 @@ int MenuMain::update()
 
 	            fnt_rpg.printC(backSurface, 320, 350, "Connect two game controllers to play with two players");
 	            DDFlipV();
-	            Sleep(2500);
+	            // Keep handling events (Android lifecycle, hot-plug) while
+	            // the message is shown; a controller plugged in meanwhile
+	            // counts from the next press.
+	            Uint32 t0 = SDL_GetTicks();
+	            while (!app_killed && SDL_GetTicks() - t0 < 2500) {
+	                in.update();
+	                SDL_Delay(10);
+	            }
+	            in.refresh();
 	            in.clearPadInput();
 	        }
 	    }
