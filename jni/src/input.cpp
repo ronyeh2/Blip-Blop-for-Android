@@ -110,6 +110,10 @@ Input::Input() : n_joy(0)
 		pads[p].gc = NULL;
 		pads[p].id = -1;
 		pads[p].stick_dir = -1;
+		for (int t = 0; t < 2; t++) {
+			pads[p].trig_rest[t] = 0;
+			pads[p].trig_on[t] = false;
+		}
 		super_pending[p] = 0;
 		aim[p] = 0.0f;
 		last_hdir[p] = 1;
@@ -117,6 +121,7 @@ Input::Input() : n_joy(0)
 			act_held[p][i] = false;
 	}
 	pause_pending = false;
+	disconnect_pending = false;
 	pad_any_held = false;
 	two_players = false;
 	ZeroMemory(buffer, 256);
@@ -286,6 +291,16 @@ static const KeyMap key_map[] = {
 	{ SDLK_BACKSPACE,		-1,			NAV_BACK },
 	{ SDLK_p,				ACT_PAUSE,	-1 },
 	{ SDLK_PAUSE,			ACT_PAUSE,	-1 },
+	// Gamepad buttons sent by a device Android does not report as a game
+	// controller (some TV remotes and remote apps, "adb shell input gamepad
+	// keyevent"). Smartblip.java turns them into F1..F6, with the same
+	// meaning as on a controller (button_map below).
+	{ SDLK_F1,				ACT_JUMP,	NAV_OK },		// A
+	{ SDLK_F2,				ACT_SUPER,	NAV_BACK },		// B
+	{ SDLK_F3,				ACT_FIRE,	NAV_OK },		// X, R1, R2
+	{ SDLK_F4,				ACT_SUPER,	-1 },			// Y, L1, L2
+	{ SDLK_F5,				ACT_PAUSE,	NAV_OK },		// START
+	{ SDLK_F6,				ACT_PAUSE,	NAV_BACK },		// SELECT
 };
 static const int NB_KEY_MAP = sizeof(key_map) / sizeof(key_map[0]);
 
@@ -314,6 +329,24 @@ static const int NB_BUTTON_MAP = sizeof(button_map) / sizeof(button_map[0]);
 
 #define STICK_THRESHOLD		14000	// ~0.43 of full deflection
 #define TRIGGER_THRESHOLD	12000
+
+// Triggers are compared with their rest position rather than with 0. When a
+// centred axis (a stick axis, -1..1 on Android) ends up mapped on a trigger,
+// SDL reads it at rest as exactly half pressed (16383), and the game would
+// fire / drop cow bombs on its own. That value is taken as the rest position;
+// any lower value brings the rest position back down. A full press still
+// clears the threshold from a half-travel rest.
+#define TRIGGER_CENTRED		16383	// SDL value of a centred axis on a trigger
+
+bool Input::triggerHeld(int slot, int t, int value)
+{
+	PadSlot &pd = pads[slot];
+	if (value == TRIGGER_CENTRED)
+		pd.trig_rest[t] = value;
+	else if (value < pd.trig_rest[t])
+		pd.trig_rest[t] = value;
+	return value - pd.trig_rest[t] > TRIGGER_THRESHOLD;
+}
 
 // Stick / DPAD directions -> aiming angle used by the shots (same convention
 // as the touch pad in Game::updateTouch: 0 = right, 90 = up, 180 = left...).
@@ -346,6 +379,8 @@ void Input::padAdded(int device_index)
 				return;
 			pads[p].id = SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(pads[p].gc));
 			pads[p].stick_dir = -1;
+			pads[p].trig_rest[0] = pads[p].trig_rest[1] = 0;
+			pads[p].trig_on[0] = pads[p].trig_on[1] = false;
 			const char *nm = SDL_GameControllerName(pads[p].gc);
 			LOGI("Controller connected: '%s' -> player %d", nm ? nm : "?", p + 1);
 			n_joy = nbPads();
@@ -370,8 +405,10 @@ void Input::padRemoved(SDL_JoystickID id)
 	LOGI("Controller of player %d disconnected", p + 1);
 	n_joy = nbPads();
 
-	// A controller vanished in the middle of a level: pause the game.
-	pause_pending = true;
+	// A controller vanished (unplugged, asleep, flat battery): the level
+	// pauses (Game::updateMenu). Kept apart from pause_pending, which the
+	// pause menu reads as "resume".
+	disconnect_pending = true;
 }
 
 int Input::padSlot(SDL_JoystickID id) const
@@ -452,9 +489,9 @@ void Input::updateHeld()
 		if (su) h[ACT_UP] = true;
 		if (sd) h[ACT_DOWN] = true;
 
-		if (SDL_GameControllerGetAxis(gc, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > TRIGGER_THRESHOLD)
+		if (triggerHeld(p, 0, SDL_GameControllerGetAxis(gc, SDL_CONTROLLER_AXIS_TRIGGERRIGHT)))
 			h[ACT_FIRE] = true;
-		if (SDL_GameControllerGetAxis(gc, SDL_CONTROLLER_AXIS_TRIGGERLEFT) > TRIGGER_THRESHOLD)
+		if (triggerHeld(p, 1, SDL_GameControllerGetAxis(gc, SDL_CONTROLLER_AXIS_TRIGGERLEFT)))
 			h[ACT_SUPER] = true;
 
 		for (int i = 0; i < NB_ACT; i++) {
@@ -510,12 +547,21 @@ bool Input::takePause()
 	return r;
 }
 
+bool Input::takeDisconnect()
+{
+	bool r = disconnect_pending;
+	disconnect_pending = false;
+	return r;
+}
+
 void Input::clearPadInput()
 {
 	clear_pad_edges();
 	for (int p = 0; p < NB_PAD_PLAYERS; p++)
 		super_pending[p] = 0;
 	pause_pending = false;
+	disconnect_pending = false;
+	nb_taps = 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -599,7 +645,6 @@ void Input::update()
 		{
 			// Triggers: RT = fire, LT = cow bomb (edges only, held state is
 			// polled in updateHeld()).
-			static bool trig[NB_PAD_PLAYERS][2];
 			int p = padSlot(e.caxis.which);
 			if (p < 0)
 				break;
@@ -608,10 +653,10 @@ void Input::update()
 			if (e.caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT)  { t = 1; act = ACT_SUPER; }
 			if (t < 0)
 				break;
-			bool on = e.caxis.value > TRIGGER_THRESHOLD;
-			if (on && !trig[p][t])
+			bool on = triggerHeld(p, t, e.caxis.value);
+			if (on && !pads[p].trig_on[t])
 				pressAction(p, act);
-			trig[p][t] = on;
+			pads[p].trig_on[t] = on;
 			break;
 		}
 
@@ -624,6 +669,8 @@ void Input::update()
 			// The 640x480 picture is letterboxed: map to picture coordinates.
 			Graphics_MapTouch(fx, fy);
 			set(e.tfinger.fingerId, state, fx, fy);
+			if (e.type == SDL_FINGERDOWN)
+				add_tap(fx, fy);
 			break;
 		}
 		}

@@ -2928,6 +2928,29 @@ void Game::updateTouch()
     {
         in.ulti = true;
     }
+
+    // A quick tap on jump / fire can start and end between two checks of
+    // the buttons above: hold it for a few updates so it still counts.
+    static const int TAP_UPDATES = 6;
+    static int jump_tap = 0, shoot_tap = 0;
+    float tx, ty;
+    while(in.take_tap(tx, ty))
+    {
+        if(box_manager.contains("jump", tx, ty))
+        jump_tap = TAP_UPDATES;
+        if(box_manager.contains("shoot", tx, ty))
+        shoot_tap = TAP_UPDATES;
+    }
+    if(jump_tap > 0)
+    {
+        in.sauter = true;
+        jump_tap--;
+    }
+    if(shoot_tap > 0)
+    {
+        in.tirer = true;
+        shoot_tap--;
+    }
 }
 
 void Game::updateMenu()
@@ -2936,9 +2959,9 @@ void Game::updateMenu()
 	//
 	///MODIF touch menu
 	//if (in.scanKey(DIK_ESCAPE)) {
-	// Touch "pause" box, app sent to background, or START / BACK on a
-	// gamepad or TV remote.
-	if(box_manager.get_state("pause") == TOUCH_UP || go_to_menu || in.takePause()) {
+	// Touch "pause" box, app sent to background, START / BACK on a
+	// gamepad or TV remote, or a controller that went away.
+	if(box_manager.get_state("pause") == TOUCH_UP || go_to_menu || in.takePause() || in.takeDisconnect()) {
 		MenuGame	menu;
 		int			r;
 		go_to_menu = false;
@@ -4150,9 +4173,10 @@ void Game::go()
 	int			r;
 	static int	zob = 0;
 
-	box_manager.add(0.3442, 0.4028,   0.65,   0.46, "START", 0);
-	box_manager.add(0.3957, 0.5017, 0.5971, 0.5614, "OPTS", 0);
-	box_manager.add(0.4371,   0.61, 0.5514, 0.6642, "EXIT", 0);
+	// Main menu: START GAME / EXIT (OPTIONS is not on Android), drawn at
+	// y = 210 and 260 like the two lines of the exit menu below.
+	box_manager.add(0.3442, 0.4328,   0.65, 0.4942, "START", 0);
+	box_manager.add(0.4371,   0.54, 0.5514, 0.5971, "EXIT", 0);
 
 	box_manager.add(0.2185, 0.4028,   0.78, 0.4614, "RET_START_GAME1", 9);
 	box_manager.add(0.2071, 0.5085, 0.7914, 0.5642, "RET_START_GAME2", 9);
@@ -4161,9 +4185,9 @@ void Game::go()
 	box_manager.add(0.4357, 0.4328, 0.5528, 0.4942, "RET_EXIT",    8);
 	box_manager.add(0.4057,   0.54, 0.5842, 0.5971, "RETOUR_EXIT", 8);
 
-	box_manager.add(cv(231), cv(261), cv(467), cv(302), "PAUSE_RESUME", 10);
-	box_manager.add(cv(278), cv(335), cv(418), cv(376), "PAUSE_OPTION", 10);
-	box_manager.add(cv(253), cv(406), cv(443), cv(446), "PAUSE_EXIT",   10);
+	// Pause menu: RESUME / EXIT GAME (no OPTIONS), drawn at y = 200 and 250.
+	box_manager.add(cv(231), cv(290), cv(467), cv(331), "PAUSE_RESUME", 10);
+	box_manager.add(cv(253), cv(363), cv(443), cv(404), "PAUSE_EXIT",   10);
 
 
     box_manager.add(cv(308), cv(639), cv(388), cv(680), "play",     98);

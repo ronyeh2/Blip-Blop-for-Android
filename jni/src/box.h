@@ -117,6 +117,7 @@ class Box_manager
     bool isinside(string name);
     bool isinside_w(string name);
     bool get_xy(string name, float &x, float &y);
+    bool contains(string name, float x, float y);
 
     private:
     vector<Box*> tab;

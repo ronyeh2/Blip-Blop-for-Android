@@ -223,7 +223,44 @@ class Touch_manager
     Touch_manager()
     {
         pad_tap = false;
+        nb_taps = 0;
         clear_pad_edges();
+    }
+
+    // Finger-down positions not yet looked at by the game. A tap shorter than
+    // a frame goes DOWN and UP before the touch buttons are checked, so the
+    // level (Game::updateTouch) reads these to not lose it.
+    enum { MAX_TAPS = 4, TAP_MAX_AGE = 250 /* ms */ };
+    struct Tap { float x, y; Uint32 t; };
+    Tap tap[MAX_TAPS];
+    int nb_taps;
+
+    void add_tap(float x, float y)
+    {
+        if(nb_taps < MAX_TAPS)
+        {
+            tap[nb_taps].x = x;
+            tap[nb_taps].y = y;
+            tap[nb_taps].t = SDL_GetTicks();
+            nb_taps++;
+        }
+    }
+    bool take_tap(float &x, float &y)
+    {
+        while(nb_taps > 0)
+        {
+            Tap tp = tap[0];
+            for(int i = 1; i < nb_taps; i++)
+            tap[i-1] = tap[i];
+            nb_taps--;
+            if(SDL_GetTicks() - tp.t <= TAP_MAX_AGE)
+            {
+                x = tp.x;
+                y = tp.y;
+                return true;
+            }
+        }
+        return false;
     }
 
     // Edges (pressed since the last refresh()) coming from the remote,
@@ -425,12 +462,18 @@ private:
 		SDL_GameController *	gc;
 		SDL_JoystickID			id;
 		int						stick_dir;	// last left-stick direction, for menu edges
+		// Triggers (0 = right / fire, 1 = left / cow bomb): rest position
+		// (see Input::triggerHeld) and whether the trigger is past the
+		// threshold.
+		int						trig_rest[2];
+		bool					trig_on[2];
 	};
 	PadSlot			pads[NB_PAD_PLAYERS];
 	bool			act_held[NB_PAD_PLAYERS][NB_ACT];
 	bool			pad_any_held;		// a controller button / stick is held
 	int				super_pending[NB_PAD_PLAYERS];
 	bool			pause_pending;
+	bool			disconnect_pending;	// a controller went away
 	bool			two_players;
 	float			aim[NB_PAD_PLAYERS];
 	int				last_hdir[NB_PAD_PLAYERS];
@@ -441,6 +484,7 @@ private:
 	void	pressAction(int player, int act);
 	void	pressNav(int nav);
 	void	updateHeld();
+	bool	triggerHeld(int slot, int t, int value);
 	char 			buffer[256];
 	char			specialsbuffer[0x1000];
 	unsigned int	aliastab[256];
@@ -481,6 +525,7 @@ public:
 	bool	padHeld(int player, int act) const;		// held, or tapped this frame
 	bool	takeSuper(int player);					// one cow bomb request per press
 	bool	takePause();							// START / BACK in game
+	bool	takeDisconnect();						// a controller was unplugged / went to sleep
 	float	padAim(int player) const { return aim[player]; }
 	bool	padHasDir(int player) const;
 	int		nbPads() const;

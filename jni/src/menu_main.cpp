@@ -94,7 +94,7 @@ MenuMain::~MenuMain()
 void MenuMain::start()
 {
 	current_menu = MENU_MAIN;
-	nb_focus = 3;
+	nb_focus = 2;
 	focus = 0;
 	updateName();
 
@@ -119,7 +119,9 @@ int MenuMain::update()
 	// Remote / gamepad / keyboard: UP/DOWN move the red focus, OK activates it,
 	// BACK leaves the sub-menu (or offers to quit from the main menu).
 	// The item names below are the touch boxes of each menu (game.cpp).
-	static const char * const items_main[]  = { "START", "OPTS", "EXIT" };
+	// OPTIONS (video / sound / keys of the PC game) is not available on
+	// Android, so it is not shown at all.
+	static const char * const items_main[]  = { "START", "EXIT" };
 	static const char * const items_start[] = { "RET_START_GAME1", "RET_START_GAME2", "RETOUR_START" };
 	static const char * const items_exit[]  = { "RET_EXIT", "RETOUR_EXIT" };
 
@@ -127,7 +129,7 @@ int MenuMain::update()
 	int nb_items = 0;
 	const char * back_item = NULL;
 
-	if (current_menu == MENU_MAIN)  { items = items_main;  nb_items = 3; back_item = "EXIT"; }
+	if (current_menu == MENU_MAIN)  { items = items_main;  nb_items = 2; back_item = "EXIT"; }
 	if (current_menu == MENU_START) { items = items_start; nb_items = 3; back_item = "RETOUR_START"; }
 	if (current_menu == MENU_EXIT)  { items = items_exit;  nb_items = 2; back_item = "RETOUR_EXIT"; }
 
@@ -140,9 +142,7 @@ int MenuMain::update()
 
 		if (step != 0) {
 			up = true;
-			do {
-				focus = (focus + step + nb_items) % nb_items;
-			} while (current_menu == MENU_MAIN && focus == 1);	// OPTIONS is disabled on Android
+			focus = (focus + step + nb_items) % nb_items;
 		}
 
 		if (in.nav[NAV_OK]) {
@@ -169,19 +169,9 @@ int MenuMain::update()
             focus = 0;
             updateName();
 	    }
-	    if(box_manager.get_state("OPTS") == TOUCH_DOWN ||
-           box_manager.get_state("OPTS") == TOUCH_PRESSING)
-	    focus = 1;
-	    /*if(box_manager.get_state("OPTS") == TOUCH_UP)
-	    {
-	        current_menu = MENU_OPTS;
-            nb_focus = 4;
-            focus = 3;
-            updateName();
-	    }*/
 	    if(box_manager.get_state("EXIT") == TOUCH_DOWN ||
            box_manager.get_state("EXIT") == TOUCH_PRESSING)
-	    focus = 2;
+	    focus = 1;
 	    if(HIT("EXIT"))
 	    {
 	        LOGI("EXIT");
@@ -230,7 +220,7 @@ int MenuMain::update()
 	    {
 	        LOGI("RETOUR_START");
 	        current_menu = MENU_MAIN;
-            nb_focus = 3;
+            nb_focus = 2;
             focus = 0;
             updateName();
 	    }
@@ -259,8 +249,8 @@ int MenuMain::update()
 	    {
 	        LOGI("RETOUR_EXIT");
 	        current_menu = MENU_MAIN;
-            nb_focus = 3;
-            focus = 2;
+            nb_focus = 2;
+            focus = 1;
             updateName();
 	    }
 	}
@@ -654,10 +644,10 @@ void MenuMain::updateName()
 	switch (current_menu) {
 		case MENU_MAIN:
 			strcpy(menu_txt[0], txt_data[TXT_START_GAME]);
-			strcpy(menu_txt[1], "OPTIONS"); //txt_data[TXT_VIDEO]);
+//		strcpy( menu_txt[1], "OPTIONS"); //txt_data[TXT_VIDEO]);	not on Android
 //		strcpy( menu_txt[2], "HIGH SCORES");//txt_data[TXT_SOUND]);
 //		strcpy( menu_txt[3], "CREDITS");//txt_data[TXT_CTRL]);
-			strcpy(menu_txt[2], txt_data[TXT_EXIT]);
+			strcpy(menu_txt[1], txt_data[TXT_EXIT]);
 			break;
 
 		case MENU_START:
