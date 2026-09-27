@@ -1191,7 +1191,8 @@ void Couille::updateArme()
 		if(t != NULL)
 		{
 		    t->hasangle = true;
-		    t->angle = in.angle;
+		    // Player 2 aims with its own controller (player 1: touch stick / pad).
+		    t->angle = (ctrl == &ctrlP2) ? in.padAim(1) : in.angle;
 		}
 
 		if (id_arme != ID_M16) {

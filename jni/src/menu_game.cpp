@@ -86,7 +86,6 @@ int MenuGame::update()
 {
 	in.update();
 	box_manager.manage(10+current_menu);
-	LOGI("MenuGame %d", current_menu);///UPDATE MENU ///a revoir(plusieurs return)
 
 	updateRedefine();
 	updateName();
@@ -111,12 +110,37 @@ int MenuGame::update()
 
 	int retour = 0;
 
+	// Remote / gamepad: UP/DOWN move the focus, OK activates it,
+	// BACK or START resume the game.
+	static const char * const items[] = { "PAUSE_RESUME", "PAUSE_OPTION", "PAUSE_EXIT" };
+	const char * pad_hit = NULL;
+
+	if (current_menu == MENU_MAIN) {
+		int step = 0;
+		if (in.nav[NAV_UP])   step = -1;
+		if (in.nav[NAV_DOWN]) step = +1;
+		if (step != 0) {
+			if (focus < 0 || focus > 2)
+				focus = 0;
+			do {
+				focus = (focus + step + 3) % 3;
+			} while (focus == 1);	// OPTIONS is disabled on Android
+		}
+		// START / BACK (pause keys) resume first, so START never picks EXIT.
+		if (in.takePause() || in.nav[NAV_BACK])
+			pad_hit = "PAUSE_RESUME";
+		else if (in.nav[NAV_OK] && focus >= 0 && focus < 3)
+			pad_hit = items[focus];
+	}
+
+#define HIT(name) (box_manager.get_state(name) == TOUCH_UP || (pad_hit != NULL && strcmp(pad_hit, name) == 0))
+
 	if(current_menu == MENU_MAIN)
 	{
 	    if(box_manager.get_state("PAUSE_RESUME") == TOUCH_DOWN ||
            box_manager.get_state("PAUSE_RESUME") == TOUCH_PRESSING)
         focus = 0;
-	    if(box_manager.get_state("PAUSE_RESUME") == TOUCH_UP)
+	    if(HIT("PAUSE_RESUME"))
 	    {
 	        LOGI("PAUSE_RESUME");
 	        retour = 1;
@@ -131,12 +155,13 @@ int MenuGame::update()
 	    if(box_manager.get_state("PAUSE_EXIT") == TOUCH_DOWN ||
            box_manager.get_state("PAUSE_EXIT") == TOUCH_PRESSING)
         focus = 2;
-	    if(box_manager.get_state("PAUSE_EXIT") == TOUCH_UP)
+	    if(HIT("PAUSE_EXIT"))
 	    {
 	        LOGI("PAUSE_EXIT");
 	        retour = 2;
 	    }
 	}
+#undef HIT
 
 	in.refresh();
 	return retour;

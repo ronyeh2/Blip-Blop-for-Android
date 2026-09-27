@@ -107,21 +107,61 @@ int MenuMain::update()
 	in.update();
 
 	box_manager.manage(current_menu);
-	LOGI("MenuMain %d ", current_menu); ///UPDATE MenuMain /// a revoir (plusieurs return)
+	up = false;
 
 	//up = in.anyKeyPressed();
 
 	updateRedefine();
 	updateName();
 
-	bool retour = RET_CONTINUE;
+	int retour = RET_CONTINUE;
+
+	// Remote / gamepad / keyboard: UP/DOWN move the red focus, OK activates it,
+	// BACK leaves the sub-menu (or offers to quit from the main menu).
+	// The item names below are the touch boxes of each menu (game.cpp).
+	static const char * const items_main[]  = { "START", "OPTS", "EXIT" };
+	static const char * const items_start[] = { "RET_START_GAME1", "RET_START_GAME2", "RETOUR_START" };
+	static const char * const items_exit[]  = { "RET_EXIT", "RETOUR_EXIT" };
+
+	const char * const * items = NULL;
+	int nb_items = 0;
+	const char * back_item = NULL;
+
+	if (current_menu == MENU_MAIN)  { items = items_main;  nb_items = 3; back_item = "EXIT"; }
+	if (current_menu == MENU_START) { items = items_start; nb_items = 3; back_item = "RETOUR_START"; }
+	if (current_menu == MENU_EXIT)  { items = items_exit;  nb_items = 2; back_item = "RETOUR_EXIT"; }
+
+	const char * pad_hit = NULL;
+
+	if (items != NULL && focus >= 0 && focus < nb_items) {
+		int step = 0;
+		if (in.nav[NAV_UP])   step = -1;
+		if (in.nav[NAV_DOWN]) step = +1;
+
+		if (step != 0) {
+			up = true;
+			do {
+				focus = (focus + step + nb_items) % nb_items;
+			} while (current_menu == MENU_MAIN && focus == 1);	// OPTIONS is disabled on Android
+		}
+
+		if (in.nav[NAV_OK]) {
+			up = true;
+			pad_hit = items[focus];
+		} else if (in.nav[NAV_BACK]) {
+			up = true;
+			pad_hit = back_item;
+		}
+	}
+
+#define HIT(name) (box_manager.get_state(name) == TOUCH_UP || (pad_hit != NULL && strcmp(pad_hit, name) == 0))
 
 	if(current_menu == MENU_MAIN)
 	{
 	    if(box_manager.get_state("START") == TOUCH_DOWN ||
            box_manager.get_state("START") == TOUCH_PRESSING)
 	    focus = 0;
-	    if(box_manager.get_state("START") == TOUCH_UP)
+	    if(HIT("START"))
 	    {
 	        LOGI("START");
 	        current_menu = MENU_START;
@@ -142,12 +182,13 @@ int MenuMain::update()
 	    if(box_manager.get_state("EXIT") == TOUCH_DOWN ||
            box_manager.get_state("EXIT") == TOUCH_PRESSING)
 	    focus = 2;
-	    if(box_manager.get_state("EXIT") == TOUCH_UP)
+	    if(HIT("EXIT"))
 	    {
 	        LOGI("EXIT");
 	        current_menu = MENU_EXIT;
             nb_focus = 2;
-            focus = 0;
+            // From the remote the safe answer is pre-selected.
+            focus = (pad_hit != NULL) ? 1 : 0;
             updateName();
 	    }
 	}
@@ -156,7 +197,7 @@ int MenuMain::update()
 	    if(box_manager.get_state("RET_START_GAME1") == TOUCH_DOWN ||
            box_manager.get_state("RET_START_GAME1") == TOUCH_PRESSING)
 	    focus = 0;
-	    if(box_manager.get_state("RET_START_GAME1") == TOUCH_UP)
+	    if(HIT("RET_START_GAME1"))
 	    {
 	        LOGI("RET_START_GAME1");
 	        retour = RET_START_GAME1;
@@ -165,21 +206,27 @@ int MenuMain::update()
 	    if(box_manager.get_state("RET_START_GAME2") == TOUCH_DOWN ||
            box_manager.get_state("RET_START_GAME2") == TOUCH_PRESSING)
 	    focus = 1;
-	    if(box_manager.get_state("RET_START_GAME2") == TOUCH_UP)
+	    if(HIT("RET_START_GAME2"))
 	    {
 	        LOGI("RET_START_GAME2");
-	        retour = RET_CONTINUE;
-	        int starting_time = GetTickCount();
+	        if (in.nbPads() >= 2) {
+	            // Two game controllers: player 1 = first pad (and the
+	            // remote / keyboard), player 2 = second pad.
+	            retour = RET_START_GAME2;
+	        } else {
+	            retour = RET_CONTINUE;
 
-	        fnt_rpg.printC(backSurface, 370, 350, "If Blip'n Blop reaches 100k downloads");
-	        DDFlipV();
-	        Sleep(3200);
+	            fnt_rpg.printC(backSurface, 320, 350, "Connect two game controllers to play with two players");
+	            DDFlipV();
+	            Sleep(2500);
+	            in.clearPadInput();
+	        }
 	    }
 
 	    if(box_manager.get_state("RETOUR_START") == TOUCH_DOWN ||
            box_manager.get_state("RETOUR_START") == TOUCH_PRESSING)
 	    focus = 2;
-	    if(box_manager.get_state("RETOUR_START") == TOUCH_UP)
+	    if(HIT("RETOUR_START"))
 	    {
 	        LOGI("RETOUR_START");
 	        current_menu = MENU_MAIN;
@@ -198,17 +245,17 @@ int MenuMain::update()
 	    if(box_manager.get_state("RET_EXIT") == TOUCH_DOWN ||
            box_manager.get_state("RET_EXIT") == TOUCH_PRESSING)
 	    focus = 0;
-	    if(box_manager.get_state("RET_EXIT") == TOUCH_UP)
+	    if(HIT("RET_EXIT"))
 	    {
 	        LOGI("RET_EXIT");
+	        // Game::go() returns, then main() returns and the activity finishes.
 	        retour = RET_EXIT;
-	        exit(0);
 	    }
 
 	    if(box_manager.get_state("RETOUR_EXIT") == TOUCH_DOWN ||
            box_manager.get_state("RETOUR_EXIT") == TOUCH_PRESSING)
 	    focus = 1;
-	    if(box_manager.get_state("RETOUR_EXIT") == TOUCH_UP)
+	    if(HIT("RETOUR_EXIT"))
 	    {
 	        LOGI("RETOUR_EXIT");
 	        current_menu = MENU_MAIN;
@@ -217,13 +264,7 @@ int MenuMain::update()
             updateName();
 	    }
 	}
-
-
-
-
-
-
-
+#undef HIT
 
 	in.refresh();
 	return retour;

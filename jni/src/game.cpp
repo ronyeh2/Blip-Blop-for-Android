@@ -37,6 +37,10 @@
 #include "ben_debug.h"
 #include "input.h"
 #include "tir_bb.h"
+
+#ifndef HISCORES_FILE
+#define HISCORES_FILE	"bb.scr"	// same as blip_n_blop_3.h (not includable here)
+#endif
 #include "event_ennemi.h"
 #include "event_gen_ennemi.h"
 #include "event_lock.h"
@@ -120,6 +124,14 @@ void Game::jouePartie(int nbj, int idj)
 {
 	if (app_killed)
 		return;
+
+	// Two players: first controller (+ remote / keyboard) = player 1,
+	// second controller = player 2. Restored when leaving the game.
+	struct TwoPlayersGuard {
+		~TwoPlayersGuard() { in.setTwoPlayers(false); }
+	} two_players_guard;
+	in.setTwoPlayers(nbj == 2);
+	in.clearPadInput();
 
 	CINEPlayer	cine;
 	bool		letsgo = true;
@@ -242,10 +254,11 @@ void Game::jouePartie(int nbj, int idj)
 		    in.update();
 		    if(in.so_pressing())
 		    pre = true;
-		    if(in.so_up() && pre)
+		    if((in.so_up() && pre) || app_killed)
 		    break;
 
 		    in.refresh();
+		    SDL_Delay(10);
 		}
 
 		mbk.stop();
@@ -490,7 +503,7 @@ bool Game::joueNiveau(const char * nom_niveau, int type)
 
 		pbk_briefing[0]->PasteTo(backSurface, 0, 0);
 		LOGI("PRESS a key");
-		fnt_cool.printC(backSurface, 320,430, "TOUCH TO BEGIN");
+		fnt_cool.printC(backSurface, 320,430, (SDL_GetNumTouchDevices() > 0 && !SDL_IsAndroidTV()) ? "TOUCH TO BEGIN" : "PRESS OK TO BEGIN");
 		DDFlip();
 
 		mbk_inter.play(2);
@@ -500,9 +513,10 @@ bool Game::joueNiveau(const char * nom_niveau, int type)
 		while(1)
 		{
 		    in.update();
-		    if(in.so_up())
+		    if(in.so_up() || app_killed)
 		    break;
 		    in.refresh();
+		    SDL_Delay(10);
 		}
 		pbk_briefing.close();
 		briefing = false;
@@ -1255,6 +1269,11 @@ void Game::updateAll()
 
 void Game::drawTools()
 {
+    // On-screen touch controls (assets/ui, see tools/make_touch_ui.py): only
+    // on touch devices, and hidden on Android TV or when a controller is used.
+    if(SDL_GetNumTouchDevices() <= 0 || SDL_IsAndroidTV() || in.nbPads() > 0)
+    return;
+
     if(in.padded )
     {
     int xx = in.pad_x-85;
@@ -2877,6 +2896,19 @@ void Game::updateTouch()
         }
     }
 
+    // Gamepad / TV remote / keyboard for player 1 (see Input::update).
+    if(in.padHeld(0, ACT_LEFT))  in.gauche = true;
+    if(in.padHeld(0, ACT_RIGHT)) in.droit = true;
+    if(in.padHeld(0, ACT_UP))    in.haut = true;
+    if(in.padHeld(0, ACT_DOWN))  in.bas = true;
+    if(in.padHeld(0, ACT_FIRE))  in.tirer = true;
+    if(in.padHeld(0, ACT_JUMP))  in.sauter = true;
+    if(!in.padded && in.padHasDir(0))
+    in.angle = in.padAim(0);    // 8-way aiming, as with the touch stick
+
+    if(in.takeSuper(0) && player1 != NULL && player1->nb_cow_bomb >= 1)
+    in.ulti = true;
+
     if(in.droit)
     last_dir = 1;
     if(in.gauche)
@@ -2904,7 +2936,9 @@ void Game::updateMenu()
 	//
 	///MODIF touch menu
 	//if (in.scanKey(DIK_ESCAPE)) {
-	if(box_manager.get_state("pause") == TOUCH_UP || go_to_menu) {
+	// Touch "pause" box, app sent to background, or START / BACK on a
+	// gamepad or TV remote.
+	if(box_manager.get_state("pause") == TOUCH_UP || go_to_menu || in.takePause()) {
 		MenuGame	menu;
 		int			r;
 		go_to_menu = false;
@@ -2936,6 +2970,9 @@ void Game::updateMenu()
 			skipped = true;
 
 		menu.stop();
+
+		// Do not let the button that closed the menu jump / fire / bomb.
+		in.waitClean();
 
 		drawAll(false);
 		DDFlipV();
@@ -3367,9 +3404,10 @@ void Game::showPE(bool bonus, bool fuckOff)
 		while(1)
 		{
 		    in.update();
-		    if(in.so_up())
+		    if(in.so_up() || app_killed)
 		    break;
 		    in.refresh();
+		    SDL_Delay(10);
 		}
 	}
 
@@ -3969,6 +4007,7 @@ void Game::getName(Joueur * joueur, int ijoueur)
 	}
 
 	hi_scores.add(joueur->getScore(), name);
+	hi_scores.save(HISCORES_FILE);	// internal storage (log.cpp create_pathSDL)
 }
 
 //-----------------------------------------------------------------------------
@@ -4135,8 +4174,8 @@ void Game::go()
 	///min    (0.0328, 0.67)
 	///max    (0.2357, 0.9828)
 	//box_manager.add(cv(3), cv(407), cv(187), cv(695), "pad",    99);
-	p_joystick.LoadPNG("data/pad.png");
-	stick.LoadPNG("data/stick.png");
+	p_joystick.LoadPNG("ui/pad.png");
+	stick.LoadPNG("ui/stick.png");
 	p_pad0.LoadPNG("data/pad0.png");
 	p_pad1.LoadPNG("data/pad1.png");
 	p_pad2.LoadPNG("data/pad2.png");
@@ -4148,19 +4187,19 @@ void Game::go()
 
 
 	box_manager.add(0.92, 0, 1, 0.1085, "pause",    99);
-	p_pause.LoadPNG("data/pause.png");
+	p_pause.LoadPNG("ui/pause.png");
 
 	box_manager.add(0.8957, 0.8571, 0.9885, 0.9885, "ulti",    99);
-	p_ulti.LoadPNG("data/ulti.png");
-	p_ulti_p.LoadPNG("data/ulti_p.png");
+	p_ulti.LoadPNG("ui/ulti.png");
+	p_ulti_p.LoadPNG("ui/ulti_p.png");
 
 	box_manager.add(0.8742, 0.68, 0.9714, 0.8128, "jump",    99);
-    p_jump.LoadPNG("data/jump.png");
-    p_jump_p.LoadPNG("data/jump_p.png");
+    p_jump.LoadPNG("ui/jump.png");
+    p_jump_p.LoadPNG("ui/jump_p.png");
 
     box_manager.add(0.7714, 0.8442, 0.8657, 0.9785, "shoot",    99);
-    p_shoot.LoadPNG("data/shoot.png");
-    p_shoot_p.LoadPNG("data/shoot_p.png");
+    p_shoot.LoadPNG("ui/shoot.png");
+    p_shoot_p.LoadPNG("ui/shoot_p.png");
 
 
 
@@ -4437,7 +4476,7 @@ int Game::selectPlayer()
 			if (x_perso < 240) {
 				x_perso += 20;
 			//} else if (in.scanKey(DIK_RIGHT) || in.scanAlias(ALIAS_P1_RIGHT)) {
-			} else if (box_manager.get_state("goblop") == TOUCH_UP) {
+			} else if (box_manager.get_state("goblop") == TOUCH_UP || in.nav[NAV_RIGHT] || in.nav[NAV_LEFT]) {
 				etape = FINI_BLIP;
 			} else if (phase) {
 				pbk_inter[4]->BlitTo(backSurface, 620, 257);
@@ -4450,7 +4489,7 @@ int Game::selectPlayer()
 			pbk_inter[8]->BlitTo(backSurface, x_nom, y_nom);
 
 			//if (x_perso >= 240 && (in.scanKey(DIK_RETURN) || in.scanAlias(ALIAS_P1_FIRE))) {
-			if(x_perso >= 240 && box_manager.get_state("play") == TOUCH_UP) {
+			if(x_perso >= 240 && (box_manager.get_state("play") == TOUCH_UP || in.nav[NAV_OK])) {
 				drawLoading();
 				DDFlipV();//primSurface->Flip( 0, NULL);
 				in.refresh();
@@ -4477,7 +4516,7 @@ int Game::selectPlayer()
 			if (x_perso > 310) {
 				x_perso -= 20;
 			//} else if (in.scanKey(DIK_LEFT) || in.scanAlias(ALIAS_P1_LEFT)) {
-			} else if (box_manager.get_state("goblip") == TOUCH_UP) {
+			} else if (box_manager.get_state("goblip") == TOUCH_UP || in.nav[NAV_LEFT] || in.nav[NAV_RIGHT]) {
 				etape = FINI_BLOP;
 			} else if (phase) {
 				pbk_inter[5]->BlitTo(backSurface, 20, 254);
@@ -4491,7 +4530,7 @@ int Game::selectPlayer()
 
 			///MODIF touch
 			//if (x_perso <= 310 && (in.scanKey(DIK_RETURN) || in.scanAlias(ALIAS_P1_FIRE))) {
-			if( x_perso <= 310 && box_manager.get_state("play") == TOUCH_UP) {
+			if( x_perso <= 310 && (box_manager.get_state("play") == TOUCH_UP || in.nav[NAV_OK])) {
 				drawLoading();
 				DDFlipV();//primSurface->Flip( 0, NULL);
 

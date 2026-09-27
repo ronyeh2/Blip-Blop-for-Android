@@ -204,9 +204,44 @@ class Finger
     float y;
     void *ptr;
 };
+// Gamepad / TV remote / keyboard actions (see Input::update).
+enum PadAction {
+    ACT_LEFT = 0, ACT_RIGHT, ACT_UP, ACT_DOWN,
+    ACT_FIRE, ACT_JUMP, ACT_SUPER, ACT_PAUSE,
+    NB_ACT
+};
+enum PadNav {
+    NAV_UP = 0, NAV_DOWN, NAV_LEFT, NAV_RIGHT, NAV_OK, NAV_BACK,
+    NB_NAV
+};
+#define NB_PAD_PLAYERS 2
+
 class Touch_manager
 {
     public :
+
+    Touch_manager()
+    {
+        pad_tap = false;
+        clear_pad_edges();
+    }
+
+    // Edges (pressed since the last refresh()) coming from the remote,
+    // a gamepad or a keyboard. pad_tap makes the "touch the screen to
+    // continue" loops accept OK / A / START / BACK too.
+    bool pad_tap;
+    bool nav[NB_NAV];
+    bool act_pressed[NB_PAD_PLAYERS][NB_ACT];
+
+    void clear_pad_edges()
+    {
+        pad_tap = false;
+        for (int i = 0; i < NB_NAV; i++)
+            nav[i] = false;
+        for (int p = 0; p < NB_PAD_PLAYERS; p++)
+            for (int i = 0; i < NB_ACT; i++)
+                act_pressed[p][i] = false;
+    }
 
     bool set(int f_id, int state, float x, float y)
     {
@@ -255,6 +290,7 @@ class Touch_manager
         tirer = false;
         sauter = false;
         ulti = false;
+        clear_pad_edges();
     }
 
     void reset()
@@ -277,6 +313,7 @@ class Touch_manager
         ulti = false;
         angle = 0;
         dist = 0;
+        clear_pad_edges();
     }
 
     int search_up()
@@ -293,7 +330,7 @@ class Touch_manager
     }
     bool so_up()
     {
-        return search_up() >= 0;
+        return search_up() >= 0 || pad_tap;
     }
     int search_down()
     {
@@ -309,7 +346,7 @@ class Touch_manager
     }
     bool so_down()
     {
-        return search_down() >= 0;
+        return search_down() >= 0 || pad_tap;
     }
 
     int search_ptr(void *ptr)
@@ -339,7 +376,7 @@ class Touch_manager
     }
     bool so_pressing()
     {
-        return search_pressing() >= 0;
+        return search_pressing() >= 0 || pad_tap;
     }
     bool nothing()
     {
@@ -381,6 +418,29 @@ class Input : public Touch_manager
 private:
 	int				n_joy;
 	DIJOYSTATE		js[MAX_JOY];
+
+	// Game controllers (Shield controller, Xbox / PlayStation pads...).
+	// Slot 0 drives player 1, slot 1 drives player 2 in a two-player game.
+	struct PadSlot {
+		SDL_GameController *	gc;
+		SDL_JoystickID			id;
+		int						stick_dir;	// last left-stick direction, for menu edges
+	};
+	PadSlot			pads[NB_PAD_PLAYERS];
+	bool			act_held[NB_PAD_PLAYERS][NB_ACT];
+	bool			pad_any_held;		// a controller button / stick is held
+	int				super_pending[NB_PAD_PLAYERS];
+	bool			pause_pending;
+	bool			two_players;
+	float			aim[NB_PAD_PLAYERS];
+	int				last_hdir[NB_PAD_PLAYERS];
+
+	void	padAdded(int device_index);
+	void	padRemoved(SDL_JoystickID id);
+	int		padSlot(SDL_JoystickID id) const;
+	void	pressAction(int player, int act);
+	void	pressNav(int nav);
+	void	updateHeld();
 	char 			buffer[256];
 	char			specialsbuffer[0x1000];
 	unsigned int	aliastab[256];
@@ -414,6 +474,18 @@ public:
 	void	close();
 	bool	anyKeyPressed();
 	bool	reAcquire();
+
+	// --- Gamepad / TV remote ---------------------------------------------
+	// player: 0 = player 1, 1 = player 2. In a one-player game every
+	// controller (and the remote / keyboard) drives player 1.
+	bool	padHeld(int player, int act) const;		// held, or tapped this frame
+	bool	takeSuper(int player);					// one cow bomb request per press
+	bool	takePause();							// START / BACK in game
+	float	padAim(int player) const { return aim[player]; }
+	bool	padHasDir(int player) const;
+	int		nbPads() const;
+	void	setTwoPlayers(bool on) { two_players = on; }
+	void	clearPadInput();
 };
 
 //-----------------------------------------------------------------------------
