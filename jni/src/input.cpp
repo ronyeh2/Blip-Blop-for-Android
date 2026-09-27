@@ -560,13 +560,14 @@ bool Input::takeDisconnect()
 	return r;
 }
 
-void Input::clearPadInput()
+void Input::clearPadInput(bool keep_disconnect)
 {
 	clear_pad_edges();
 	for (int p = 0; p < NB_PAD_PLAYERS; p++)
 		super_pending[p] = 0;
 	pause_pending = false;
-	disconnect_pending = false;
+	if (!keep_disconnect)
+		disconnect_pending = false;
 	nb_taps = 0;
 }
 

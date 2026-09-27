@@ -53,6 +53,7 @@ class Box
         if(state == TOUCH_PRESSING)
         state = TOUCH_DOWN;
 
+        bool was_inside = isinside;
         isinside = false;
         isinside_w = false;
 
@@ -102,9 +103,10 @@ class Box
 
         // Held, but no finger belongs to this box any more: its finger was
         // lifted and reused for a new press within one frame (see
-        // Touch_manager::set), so the release was never seen here.
+        // Touch_manager::set), so the release was never seen here. Like a
+        // normal release, it only counts as a tap if the finger was inside.
         if(!owned && (state == TOUCH_DOWN || state == TOUCH_PRESSING))
-        state = TOUCH_UP;
+        state = was_inside ? TOUCH_UP : TOUCH_NOTHING;
 
     }
 

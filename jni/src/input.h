@@ -554,7 +554,7 @@ public:
 	bool	padHasDir(int player) const;
 	int		nbPads() const;
 	void	setTwoPlayers(bool on) { two_players = on; }
-	void	clearPadInput();
+	void	clearPadInput(bool keep_disconnect = false);
 };
 
 //-----------------------------------------------------------------------------

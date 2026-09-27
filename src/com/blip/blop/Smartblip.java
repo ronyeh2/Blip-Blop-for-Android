@@ -1,9 +1,10 @@
 package com.blip.blop;
 
+import android.view.InputDevice;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 
 import org.libsdl.app.SDLActivity;
-import org.libsdl.app.SDLControllerManager;
 
 public class Smartblip extends SDLActivity
 {
@@ -16,10 +17,10 @@ public class Smartblip extends SDLActivity
         };
     }
 
-    // Gamepad button key events from a device that Android does not report
-    // as a game controller (some TV remotes and remote apps, "adb shell input
-    // gamepad keyevent") go down SDL's keyboard path, where BUTTON_* keys
-    // have no SDL key and are dropped. Hand them over as F1..F6 instead;
+    // Gamepad button key events from a device that SDL does not open as a
+    // joystick (TV remotes, remote apps, "adb shell input gamepad keyevent")
+    // go down SDL's keyboard path, where most BUTTON_* keys are dropped or
+    // turned into the wrong key. Hand them over as F1..F6 instead;
     // jni/src/input.cpp gives those the same meaning as on a controller.
     // Real controllers are left alone: SDL reads them as game controllers.
     private static int gamepadButtonToKey(int keyCode) {
@@ -38,10 +39,28 @@ public class Smartblip extends SDLActivity
         }
     }
 
+    // Same rule as SDL: with SDL_TV_REMOTE_AS_JOYSTICK=0, Android_AddJoystick
+    // skips devices with fewer than two joystick axes and no hat.
+    private static boolean opensAsJoystick(int deviceId) {
+        InputDevice device = InputDevice.getDevice(deviceId);
+        if (device == null)
+            return false;
+        int axes = 0, hats = 0;
+        for (InputDevice.MotionRange range : device.getMotionRanges()) {
+            if ((range.getSource() & InputDevice.SOURCE_CLASS_JOYSTICK) == 0)
+                continue;
+            if (range.getAxis() == MotionEvent.AXIS_HAT_X || range.getAxis() == MotionEvent.AXIS_HAT_Y)
+                hats++;
+            else
+                axes++;
+        }
+        return axes >= 2 || hats >= 2;   // a hat is an X and a Y range
+    }
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int key = gamepadButtonToKey(event.getKeyCode());
-        if (key >= 0 && !SDLControllerManager.isDeviceSDLJoystick(event.getDeviceId())) {
+        if (key >= 0 && !opensAsJoystick(event.getDeviceId())) {
             event = new KeyEvent(event.getDownTime(), event.getEventTime(), event.getAction(),
                     key, event.getRepeatCount(), event.getMetaState(), event.getDeviceId(),
                     event.getScanCode(), event.getFlags(), event.getSource());

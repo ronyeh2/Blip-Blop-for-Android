@@ -522,6 +522,10 @@ bool Game::joueNiveau(const char * nom_niveau, int type)
 		briefing = false;
 	}
 
+	// Drop the START / A / B that ended the briefing, a cutscene or the
+	// previous level, so the level does not open paused, jumping or bombing.
+	in.clearPadInput(true);
+
 	// Update quelques trucs
 	//
 	updateEvents();
