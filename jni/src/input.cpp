@@ -30,6 +30,7 @@
 #include "graphics.h"
 #include "input.h"
 #include "ben_debug.h"
+#include <unistd.h>
 
 
 
@@ -596,8 +597,12 @@ void Input::update()
 			break;
 
 		case SDL_QUIT:
+			// The activity is being destroyed and the game cannot restart
+			// in this process. _exit, not exit: exit() runs the C++ static
+			// destructors while Android's render threads still use them,
+			// which aborts (FORTIFY: pthread_mutex_lock on a destroyed mutex).
 			app_killed = true;
-			exit(0);
+			_exit(0);
 			break;
 
 		case SDL_RENDER_TARGETS_RESET:
