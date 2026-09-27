@@ -35,7 +35,8 @@ tools and runs on current phones and on Android TV, including the
   - Connecting or disconnecting a controller or remote no longer restarts the
     game.
 - **Gamepad and remote:**
-  - Every menu works with a TV remote (D-pad, OK and BACK).
+  - Every menu works with a TV remote (D-pad, OK and BACK). The PC game's
+    OPTIONS screen does not exist on Android, so it is not in the menus.
   - The game can be played with any game controller (Shield, Xbox,
     PlayStation...).
   - Controllers can be connected or disconnected at any time. Disconnecting
@@ -73,7 +74,22 @@ export ANDROID_HOME=$HOME/Library/Android/sdk     # or your SDK location
 ./gradlew assembleDebug
 ```
 
-The APK is written to `build/outputs/apk/debug/BlipBlop-debug.apk`.
+The APK is written to `build/outputs/apk/debug/BlipBlop-debug.apk`. The build
+stops with an error if `assets/data/` is missing.
+
+For a release build, put your keystore in `keystore.properties` (not in git):
+
+```properties
+storeFile=/path/to/release.jks
+storePassword=...
+keyAlias=...
+keyPassword=...
+```
+
+or set `BLIPBLOP_STORE_FILE`, `BLIPBLOP_STORE_PASSWORD`, `BLIPBLOP_KEY_ALIAS`
+and `BLIPBLOP_KEY_PASSWORD`, then run `./gradlew assembleRelease`
+(`build/outputs/apk/release/`). Without a keystore the release APK is signed
+with the debug key, which is enough for sideloading.
 
 ## Installing on an NVIDIA Shield (or any Android TV)
 
@@ -118,6 +134,16 @@ controller plays player 2.
 | Play/Pause, Menu| Jump                 | -           |
 | Fast forward    | Cow bomb             | -           |
 | BACK            | Pause menu / resume  | Back        |
+
+Only the D-pad, OK and BACK are on every remote. Jumping needs a Play/Pause or
+Menu key and the cow bomb needs a Fast forward key. Many remotes have no such
+keys (the Google TV / Chromecast remote, the older Shield remotes), and many
+can't send a D-pad direction and OK at the same time. On those remotes the
+menus work but the game can't really be played. **A gamepad is recommended.**
+
+Remotes and remote apps that send gamepad buttons (A, B, X, Y, START...)
+without being a game controller work too: those buttons mean the same as on a
+gamepad.
 
 Screens that wait for a touch ("TOUCH TO BEGIN", intro, briefings, game
 over) continue on OK, A, START or BACK.
