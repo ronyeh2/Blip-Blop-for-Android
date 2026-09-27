@@ -175,6 +175,8 @@ top right is pause.
 1. Connect two game controllers (Bluetooth or USB). The first one to connect
    is player 1, the second one is player 2. A third controller is ignored
    until one of the two is disconnected, then it takes the free place.
+   Outside a 2-player game, if player 1's controller is disconnected the
+   other one becomes player 1.
 2. Choose **START GAME > START 2 PLAYERS GAME**. With fewer than two
    controllers the game says "Connect two game controllers to play with two
    players" and stays in the menu.
