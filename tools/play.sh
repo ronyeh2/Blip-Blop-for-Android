@@ -11,6 +11,10 @@ export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 [ -d assets/data ] || tools/fetch_game_data.sh
 ./gradlew -q assembleDebug
 
+# Without hw.keyboard=yes the emulator drops the Mac's keyboard input.
+CFG="$HOME/.android/avd/$AVD.avd/config.ini"
+[ -f "$CFG" ] && sed -i '' 's/^hw.keyboard=no/hw.keyboard=yes/' "$CFG"
+
 if ! adb devices | grep -q '^emulator-'; then
     emulator -avd "$AVD" -gpu host >/dev/null 2>&1 &
 fi
