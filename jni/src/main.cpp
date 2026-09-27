@@ -14,8 +14,14 @@ int main(int argc, char **argv)
     SDL_SetHint(SDL_HINT_TV_REMOTE_AS_JOYSTICK, "0");
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "0");
 
-    if (!InitApp(0, 0))
+    if (!InitApp(0, 0)) {
+        // Usually the game data is missing from the APK (assets/data, see
+        // tools/fetch_game_data.sh). Say so instead of closing silently.
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Blip & Blop",
+            "The game could not start: its data files are missing or damaged.\n"
+            "Reinstall the app.", NULL);
         return 1;
+    }
 
     game.go();
 

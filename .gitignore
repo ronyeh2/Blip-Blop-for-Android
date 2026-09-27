@@ -45,3 +45,8 @@ captures/
 
 # Game data from the PC release (tools/fetch_game_data.sh)
 /assets/data/
+
+# Release signing (build.gradle)
+keystore.properties
+*.jks
+*.keystore

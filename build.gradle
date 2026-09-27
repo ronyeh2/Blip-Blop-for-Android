@@ -46,10 +46,40 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    // Release signing: a keystore described in keystore.properties (not in
+    // git) or in environment variables:
+    //   storeFile=/path/to/release.jks   (BLIPBLOP_STORE_FILE)
+    //   storePassword=...                (BLIPBLOP_STORE_PASSWORD)
+    //   keyAlias=...                     (BLIPBLOP_KEY_ALIAS)
+    //   keyPassword=...                  (BLIPBLOP_KEY_PASSWORD)
+    // Without one, the release APK is signed with the debug key so it can
+    // still be sideloaded (fine for a Shield, not for a store).
+    def signingProps = new Properties()
+    def signingFile = rootProject.file('keystore.properties')
+    if (signingFile.exists()) {
+        signingFile.withInputStream { signingProps.load(it) }
+    }
+    def signingValue = { String key, String env -> signingProps.getProperty(key) ?: System.getenv(env) }
+    def releaseStore = signingValue('storeFile', 'BLIPBLOP_STORE_FILE')
+
+    signingConfigs {
+        if (releaseStore) {
+            release {
+                storeFile file(releaseStore)
+                storePassword signingValue('storePassword', 'BLIPBLOP_STORE_PASSWORD')
+                keyAlias signingValue('keyAlias', 'BLIPBLOP_KEY_ALIAS')
+                keyPassword signingValue('keyPassword', 'BLIPBLOP_KEY_PASSWORD')
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // R8 must not rename org.libsdl.app: the native code looks it up by name.
+            signingConfig releaseStore ? signingConfigs.release : signingConfigs.debug
+            // proguard-rules.pro keeps org.libsdl.app, which the native code
+            // looks up by name, so R8 can be turned on safely.
             minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 
@@ -67,5 +97,15 @@ android {
 
     lint {
         abortOnError false
+    }
+}
+
+// The game data is not in git (tools/fetch_game_data.sh). Without it the APK
+// builds but the game closes at once on the device, so refuse to build.
+tasks.named('preBuild') {
+    doFirst {
+        if (!file('assets/data/uk.dat').exists()) {
+            throw new GradleException('Game data missing in assets/data/: run tools/fetch_game_data.sh first')
+        }
     }
 }
