@@ -798,28 +798,38 @@ void Input::waitClean()
 	while (1)
 	{
 		bool j = false;
+		bool keys = false;
 		update();
 		for (int i = 0; i < 256; i++)
 		{
 			if (buffer[i] != 0)
 			{
-				j = true;
+				keys = true;
 			}
 		}
 		for (int i = 0; i < 0xFFF; i++)
 		{
 			if (specialsbuffer[i] != 0)
 			{
-				j = true;
+				keys = true;
 			}
 		}
-		// Controllers: wait for the buttons to be released, but never more
-		// than a second (a drifting stick or a noisy trigger must not freeze
-		// the game here).
-		if (pad_any_held && SDL_GetTicks() - start < 1000)
+		// Wait for keys and controller buttons to be released, but never
+		// more than a second: a drifting stick, a noisy trigger or a remote
+		// key whose release got lost must not freeze the game here.
+		bool waited = SDL_GetTicks() - start >= 1000;
+		if ((keys || pad_any_held) && !waited)
 			j = true;
 		if (!j || app_killed)
 		{
+			if (keys) {
+				// Still "held" after a second: most likely the release was
+				// lost (e.g. across a background / foreground switch).
+				// Forget it, or the key would stay stuck in the game too.
+				LOGI("waitClean: key still held after 1 s, releasing it");
+				ZeroMemory(buffer, sizeof(buffer));
+				ZeroMemory(specialsbuffer, sizeof(specialsbuffer));
+			}
 			if (pad_any_held) {
 				int mask = 0;
 				for (int p = 0; p < NB_PAD_PLAYERS; p++)

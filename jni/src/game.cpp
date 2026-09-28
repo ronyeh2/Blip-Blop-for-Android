@@ -508,7 +508,7 @@ bool Game::joueNiveau(const char * nom_niveau, int type)
 
 		pbk_briefing[0]->PasteTo(backSurface, 0, 0);
 		LOGI("PRESS a key");
-		fnt_cool.printC(backSurface, 320,430, (SDL_GetNumTouchDevices() > 0 && !SDL_IsAndroidTV()) ? "TOUCH TO BEGIN" : "PRESS OK TO BEGIN");
+		fnt_cool.printC(backSurface, 320,430, (SDL_GetNumTouchDevices() > 0 && !SDL_IsAndroidTV() && in.nbPads() == 0) ? "TOUCH TO BEGIN" : "PRESS OK TO BEGIN");
 		DDFlip();
 
 		mbk_inter.play(2);
