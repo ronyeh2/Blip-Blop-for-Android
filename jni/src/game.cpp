@@ -3675,51 +3675,41 @@ void Game::updateDeformation()
 
 void Game::drawDeformation()
 {
-	DDBLTFX         ddfx;
-	RECT	r;
-	int		pas = 20;
-	int		phi = phi_deform;
-	int		dphi = 10;
-	int		x;
-	int		xt;
+	// Underwater ripple: each band of 2 lines is shifted sideways along a
+	// sine wave and the uncovered pixels are filled with black. The shift is
+	// done in place with memmove; a blit of the surface onto itself (as the
+	// original DirectDraw code did) copies left to right, so the lines
+	// shifted to the right turned into smeared streaks.
+	SDL_Surface *	s = backSurface->Get();
+	const int		pas = 2;
+	const int		dphi = 1;
+	int				phi = phi_deform;
+	int				w = s->w;
 
-	ZeroMemory(&ddfx, sizeof(ddfx));
-	ddfx.dwSize = sizeof(ddfx);
-	ddfx.dwFillColor = 0; // Noir
+	if (SDL_MUSTLOCK(s))
+		SDL_LockSurface(s);
 
-	pas = 2;
-	dphi = 1;
-
-	for (int y = 0; y < 480; y += pas) {
+	for (int y = 0; y < s->h; y += pas) {
 		phi += dphi;
 		phi %= 360;
 
-		r.top	= y;
-		r.bottom = y + pas;
+		int x = (5 * bSin[phi]) >> COSINUS;
 
-		x = xt = (5 * bSin[phi]) >> COSINUS;
+		for (int line = y; line < y + pas && line < s->h; line++) {
+			Uint32 *	p = (Uint32 *) ((Uint8 *) s->pixels + line * s->pitch);
 
-		if (x < 0) {
-			r.left	= -x;
-			r.right = 640;
-			x = 0;
-		} else {
-			r.left	= 0;
-			r.right = 640 - x;
+			if (x > 0) {
+				memmove(p + x, p, (w - x) * sizeof(Uint32));
+				memset(p, 0, x * sizeof(Uint32));
+			} else if (x < 0) {
+				memmove(p, p - x, (w + x) * sizeof(Uint32));
+				memset(p + w + x, 0, -x * sizeof(Uint32));
+			}
 		}
-
-		backSurface->BltFast(x, y, backSurface, &r, DDBLTFAST_WAIT | DDBLTFAST_NOCOLORKEY);
-
-		if (xt < 0) {
-			r.left	= 640 + xt;
-			r.right = 640;
-		} else {
-			r.left	= 0;
-			r.right = xt;
-		}
-
-		backSurface->Blt(&r, NULL, NULL, DDBLT_WAIT | DDBLT_COLORFILL, &ddfx);
 	}
+
+	if (SDL_MUSTLOCK(s))
+		SDL_UnlockSurface(s);
 }
 
 //-----------------------------------------------------------------------------
