@@ -72,6 +72,8 @@
 MenuMain::MenuMain()
 {
 	redefine = -1;
+	editing_lives = false;
+	lives_edit = start_lives;
 
 	menu_txt = new char * [NB_TXT];
 
@@ -94,8 +96,9 @@ MenuMain::~MenuMain()
 void MenuMain::start()
 {
 	current_menu = MENU_MAIN;
-	nb_focus = 2;
+	nb_focus = 3;
 	focus = 0;
+	editing_lives = false;
 	updateName();
 
 	start_music_on = music_on;
@@ -121,7 +124,7 @@ int MenuMain::update()
 	// The item names below are the touch boxes of each menu (game.cpp).
 	// OPTIONS (video / sound / keys of the PC game) is not available on
 	// Android, so it is not shown at all.
-	static const char * const items_main[]  = { "START", "EXIT" };
+	static const char * const items_main[]  = { "START", "LIVES", "EXIT" };
 	static const char * const items_start[] = { "RET_START_GAME1", "RET_START_GAME2", "RETOUR_START" };
 	static const char * const items_exit[]  = { "RET_EXIT", "RETOUR_EXIT" };
 
@@ -129,7 +132,40 @@ int MenuMain::update()
 	int nb_items = 0;
 	const char * back_item = NULL;
 
-	if (current_menu == MENU_MAIN)  { items = items_main;  nb_items = 2; back_item = "EXIT"; }
+	if (current_menu == MENU_MAIN)  { items = items_main;  nb_items = 3; back_item = "EXIT"; }
+
+	// LIVES being changed: LEFT / RIGHT change it by 1, UP / DOWN by 10,
+	// OK sets it, BACK leaves it as it was. On a touch screen, the left and
+	// right parts of the line lower / raise it and its middle sets it.
+	if (current_menu == MENU_MAIN && editing_lives) {
+		int step = 0;
+		if (in.nav[NAV_LEFT]  || box_manager.get_state("LIVES_MINUS") == TOUCH_UP) step = -1;
+		if (in.nav[NAV_RIGHT] || box_manager.get_state("LIVES_PLUS")  == TOUCH_UP) step = +1;
+		if (in.nav[NAV_DOWN]) step = -10;
+		if (in.nav[NAV_UP])   step = +10;
+
+		if (step != 0) {
+			up = true;
+			lives_edit += step;
+			if (lives_edit < LIVES_MIN) lives_edit = LIVES_MIN;
+			if (lives_edit > LIVES_MAX) lives_edit = LIVES_MAX;
+		}
+
+		if (in.nav[NAV_OK] || box_manager.get_state("LIVES") == TOUCH_UP) {
+			up = true;
+			start_lives = lives_edit;
+			save_lives_setting();
+			editing_lives = false;
+			LOGI("LIVES set to %d", start_lives);
+		} else if (in.nav[NAV_BACK]) {
+			up = true;
+			editing_lives = false;
+		}
+
+		updateName();
+		in.refresh();
+		return RET_CONTINUE;
+	}
 	if (current_menu == MENU_START) { items = items_start; nb_items = 3; back_item = "RETOUR_START"; }
 	if (current_menu == MENU_EXIT)  { items = items_exit;  nb_items = 2; back_item = "RETOUR_EXIT"; }
 
@@ -169,9 +205,22 @@ int MenuMain::update()
             focus = 0;
             updateName();
 	    }
+	    if(box_manager.get_state("LIVES") == TOUCH_DOWN ||
+           box_manager.get_state("LIVES") == TOUCH_PRESSING ||
+           box_manager.get_state("LIVES_MINUS") == TOUCH_DOWN ||
+           box_manager.get_state("LIVES_PLUS") == TOUCH_DOWN)
+	    focus = 1;
+	    if(HIT("LIVES") || box_manager.get_state("LIVES_MINUS") == TOUCH_UP ||
+           box_manager.get_state("LIVES_PLUS") == TOUCH_UP)
+	    {
+	        LOGI("LIVES");
+	        editing_lives = true;
+	        lives_edit = start_lives;
+	        updateName();
+	    }
 	    if(box_manager.get_state("EXIT") == TOUCH_DOWN ||
            box_manager.get_state("EXIT") == TOUCH_PRESSING)
-	    focus = 1;
+	    focus = 2;
 	    if(HIT("EXIT"))
 	    {
 	        LOGI("EXIT");
@@ -228,7 +277,7 @@ int MenuMain::update()
 	    {
 	        LOGI("RETOUR_START");
 	        current_menu = MENU_MAIN;
-            nb_focus = 2;
+            nb_focus = 3;
             focus = 0;
             updateName();
 	    }
@@ -257,8 +306,8 @@ int MenuMain::update()
 	    {
 	        LOGI("RETOUR_EXIT");
 	        current_menu = MENU_MAIN;
-            nb_focus = 2;
-            focus = 1;
+            nb_focus = 3;
+            focus = 2;
             updateName();
 	    }
 	}
@@ -567,6 +616,12 @@ void MenuMain::draw(SDL::Surface * surf)
 
 		y += 50;
 	}
+	if (current_menu == MENU_MAIN && editing_lives) {
+		if (SDL_GetNumTouchDevices() > 0 && !SDL_IsAndroidTV() && in.nbPads() == 0)
+			fnt_rpg.printC(surf, 320, 350, "Tap left or right to change, middle to set");
+		else
+			fnt_rpg.printC(surf, 320, 350, "Left or right to change, up or down by 10, OK to set");
+	}
 	fnt_rpg.printC(surf, 500, 450, "Ported by Martin JULES");
 	fnt_rpg.printC(surf, 30, 450, "2002");
 
@@ -655,7 +710,15 @@ void MenuMain::updateName()
 //		strcpy( menu_txt[1], "OPTIONS"); //txt_data[TXT_VIDEO]);	not on Android
 //		strcpy( menu_txt[2], "HIGH SCORES");//txt_data[TXT_SOUND]);
 //		strcpy( menu_txt[3], "CREDITS");//txt_data[TXT_CTRL]);
-			strcpy(menu_txt[1], txt_data[TXT_EXIT]);
+			// The menu font has no arrows: the number blinks while it is
+			// being changed.
+			if (editing_lives && (SDL_GetTicks() / 300) % 2)
+				strcpy(menu_txt[1], "LIVES    ");
+			else if (editing_lives)
+				sprintf(menu_txt[1], "LIVES  %d", lives_edit);
+			else
+				sprintf(menu_txt[1], "LIVES  %d", start_lives);
+			strcpy(menu_txt[2], txt_data[TXT_EXIT]);
 			break;
 
 		case MENU_START:

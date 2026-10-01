@@ -4204,10 +4204,14 @@ void Game::go()
 	int			r;
 	static int	zob = 0;
 
-	// Main menu: START GAME / EXIT (OPTIONS is not on Android), drawn at
-	// y = 210 and 260 like the two lines of the exit menu below.
-	box_manager.add(0.3442, 0.4328,   0.65, 0.4942, "START", 0);
-	box_manager.add(0.4371,   0.54, 0.5514, 0.5971, "EXIT", 0);
+	// Main menu: START GAME / LIVES / EXIT (OPTIONS is not on Android),
+	// drawn at y = 195, 245 and 295. While LIVES is being changed, the left
+	// and right parts of its line lower / raise it.
+	box_manager.add(0.3442, 0.4015,   0.65, 0.4629, "START", 0);
+	box_manager.add(  0.28, 0.5057,   0.42, 0.5671, "LIVES_MINUS", 0);
+	box_manager.add(  0.42, 0.5057,   0.58, 0.5671, "LIVES", 0);
+	box_manager.add(  0.58, 0.5057,   0.72, 0.5671, "LIVES_PLUS", 0);
+	box_manager.add(0.4371, 0.6098, 0.5514, 0.6713, "EXIT", 0);
 
 	box_manager.add(0.2185, 0.4028,   0.78, 0.4614, "RET_START_GAME1", 9);
 	box_manager.add(0.2071, 0.5085, 0.7914, 0.5642, "RET_START_GAME2", 9);

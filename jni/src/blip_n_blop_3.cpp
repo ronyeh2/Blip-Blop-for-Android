@@ -191,6 +191,7 @@ bool InitApp(HINSTANCE hInstance, int nCmdShow)
 
 
 	load_BB3_config(CONFIG_FILE);
+	load_lives_setting();
 
 	//------------------------------------------------------------------
 	//			Charge les hi scores
