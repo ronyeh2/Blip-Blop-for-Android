@@ -379,6 +379,15 @@ bool InitApp(HINSTANCE hInstance, int nCmdShow)
 		vbuffer_wide = WANTED_VBUFFER_WIDE;
 	}
 
+	// The screen-sized buffers stand for DirectDraw surfaces, which have no
+	// alpha: copying from them must be a plain copy. With SDL's default
+	// alpha blending, a copy of a surface onto itself (the screen shake,
+	// the underwater ripple) goes through the blending code, which is not
+	// safe for overlapping copies and smears the picture.
+	SDL::Surface * opaque[] = { primSurface, backSurface, systemSurface, videoA };
+	for (int i = 0; i < 4; i++)
+		SDL_SetSurfaceBlendMode(opaque[i]->Get(), SDL_BLENDMODE_NONE);
+
 	LOGI("eighth");
 
 	//------------------------------------------------------------------
