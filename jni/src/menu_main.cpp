@@ -69,6 +69,29 @@
 #define NB_TXT		10
 
 
+// fnt_rpg is the smallest font of the game: for smaller text, draw it once
+// into a buffer and blit that scaled down to 3/4.
+static void printSmallC(SDL::Surface * surf, int xc, int y, const char * txt, SDL::Surface * & cache)
+{
+	if (cache == NULL) {
+		int w = fnt_rpg.width(txt) + 4;
+		int h = fnt_rpg.height() * 2;
+
+		cache = CreateSDLSurface(w, h, 32);
+		SDL_FillRect(cache->Get(), NULL, 0);	// transparent
+		fnt_rpg.print(cache, 2, h / 4, txt);
+	}
+
+	SDL_Surface *	s = cache->Get();
+	SDL_Rect		dst;
+
+	dst.w = s->w * 3 / 4;
+	dst.h = s->h * 3 / 4;
+	dst.x = xc - dst.w / 2;
+	dst.y = y;
+	SDL_BlitScaled(s, NULL, surf->Get(), &dst);
+}
+
 MenuMain::MenuMain()
 {
 	redefine = -1;
@@ -622,7 +645,10 @@ void MenuMain::draw(SDL::Surface * surf)
 		else
 			fnt_rpg.printC(surf, 320, 350, "Left or right to change, up or down by 10, OK to set");
 	}
-	fnt_rpg.printC(surf, 500, 450, "Ported by Martin JULES");
+	static SDL::Surface * credit1 = NULL;
+	static SDL::Surface * credit2 = NULL;
+	printSmallC(surf, 530, 436, "Ported by Martin JULES", credit1);
+	printSmallC(surf, 530, 452, "Updated by Ron.R.y", credit2);
 	fnt_rpg.printC(surf, 30, 450, "2002");
 
 	}
